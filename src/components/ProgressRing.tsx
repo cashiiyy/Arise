@@ -41,7 +41,11 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
 
   return (
     <View style={{ width: radius * 2, height: radius * 2, justifyContent: 'center', alignItems: 'center' }}>
-      <Svg width={radius * 2} height={radius * 2} style={StyleSheet.absoluteFill}>
+      <Svg 
+        width={radius * 2} 
+        height={radius * 2} 
+        style={[StyleSheet.absoluteFill, { transform: [{ rotate: '-90deg' }] }]}
+      >
         {/* Background Circle */}
         <Circle
           stroke={backgroundColor}
@@ -62,9 +66,6 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
           strokeDasharray={`${circumference} ${circumference}`}
           animatedProps={animatedProps}
           strokeLinecap="round"
-          originX={radius}
-          originY={radius}
-          rotation="-90"
         />
       </Svg>
       {children}

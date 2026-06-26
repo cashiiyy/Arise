@@ -3,15 +3,13 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { SystemText } from '../../components/SystemText';
 import { SystemCard } from '../../components/SystemCard';
 import { SystemButton } from '../../components/SystemButton';
-import { ProgressRing } from '../../components/ProgressRing';
 import { useUserStore } from '../../store/useUserStore';
-import { useMockBLE } from '../../ble/MockBLEProvider';
+import { LiveWatchWidget } from '../../components/LiveWatchWidget';
 import { COLORS } from '../../theme';
 import { useRouter } from 'expo-router';
 
 export default function Home() {
-  const { name, rank, xp, levelProgress } = useUserStore();
-  const { isConnected, heartRate, steps } = useMockBLE();
+  const { name, rank, xp } = useUserStore();
   const router = useRouter();
 
   return (
@@ -46,27 +44,7 @@ export default function Home() {
       </SystemCard>
 
       {/* Watch Widget */}
-      <SystemText variant="h2" style={{ marginVertical: 16 }}>SYSTEM SENSORS</SystemText>
-      <SystemCard glow={false} style={styles.sensorsContainer}>
-        <View style={styles.sensorItem}>
-          <ProgressRing progress={steps / 10000} radius={40} color={COLORS.secondary}>
-            <SystemText variant="h2">{steps}</SystemText>
-            <SystemText variant="muted">Steps</SystemText>
-          </ProgressRing>
-        </View>
-        <View style={styles.sensorItem}>
-          <ProgressRing progress={heartRate / 200} radius={40} color={COLORS.danger}>
-            <SystemText variant="h2">{heartRate}</SystemText>
-            <SystemText variant="muted">BPM</SystemText>
-          </ProgressRing>
-        </View>
-      </SystemCard>
-      
-      {!isConnected && (
-        <SystemText variant="muted" align="center" style={{ marginTop: 8 }}>
-          Watch not connected. Showing mock data.
-        </SystemText>
-      )}
+      <LiveWatchWidget />
 
       {/* CTA */}
       <View style={{ marginTop: 32 }}>
