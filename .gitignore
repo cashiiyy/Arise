@@ -41,3 +41,10 @@ example
 # generated native folders
 /ios
 /android
+
+# local JDK downloads
+jdk/
+jdk17/
+jdk21.zip
+jdk17.zip
+

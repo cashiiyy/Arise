@@ -1,6 +1,6 @@
 import { Exercise } from './exerciseTypes';
 
-const RAW_EXERCISES: Exercise[] = require('../../Exercises/exercisedb_v1_sample/exercises.json');
+export const allExercises: Exercise[] = require('../../Exercises/exercisedb_v1_sample/exercises.json');
 
 // Indexes
 export const exerciseById: Record<string, Exercise> = {};
@@ -13,7 +13,7 @@ let _initialized = false;
 export function initializeExerciseIndexes() {
   if (_initialized) return;
 
-  for (const raw of RAW_EXERCISES) {
+  for (const raw of allExercises) {
     // 1. By ID
     exerciseById[raw.exerciseId] = raw;
 

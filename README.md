@@ -1,56 +1,75 @@
-# Welcome to your Expo app 👋
+# 🌌 Arise: Solo Leveling Fitness RPG App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Arise is a Solo Leveling-inspired fitness RPG app that gamifies your workout routine. Level up your real-life strength, agility, and endurance, gain XP, and rank up from E-Rank to S-Rank. It combines high-performance workout tracking, AI-powered customized training schedules, nutrition monitoring, and real-time offline synchronization.
 
-## Get started
+---
 
-1. Install dependencies
+## 🌟 Key Features
 
-   ```bash
-   npm install
-   ```
+### 1. Solo Leveling Gamified Interface
+* **Rank & XP Progression:** Earn XP by completing workouts and hitting your sets/reps targets. Rank up your character from E-Rank all the way to S-Rank.
+* **Futuristic Dark Theme:** Sleek dark-mode interface utilizing neon blue (`#00f0ff`) and purple (`#a100ff`) neon glows to match the futuristic gates/dungeons style.
+* **Biometrics & Stats:** Monitor your strength, agility, and intelligence attributes based on your workout consistency and type of exercises.
 
-2. Start the app
+### 2. Complete Offline-First database (Expo SQLite)
+* All user profiles, biometrics, planned workouts, active logs, set histories, and custom entries are persisted directly on your device using `expo-sqlite`. No constant internet connection required.
 
-   ```bash
-   npx expo start
-   ```
+### 3. Integrated Exercise Dataset
+* **Indexed Search Layer:** High-speed lookup indices (`exerciseById`, `exerciseByMuscle`, `exerciseByEquipment`, etc.) initialized once for smooth searching without lag.
+* **Visual Guides:** High-quality autoplaying loop GIFs showing exactly how to perform exercises correctly.
+* **Manual Additions:** Flexibility to search the database and manually inject any exercise into your active workout session.
 
-In the output, you'll find options to open the app in a
+### 4. AI-Powered Workout Planner
+* **Provider-based Architecture:** Modular AI system under `src/ai` ready for providers like Gemini, OpenAI, Claude, or Ollama, supported by a rule-based deterministic orchestration engine.
+* **Custom Generator:** Generates custom daily and weekly workout routines tailored to your specific Rank, target focus areas, and available gym equipment.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 5. Nutrition & Food Tracker
+* Fully scrollable and instant local search of foods and macronutrients to log daily calorie, protein, carb, and fat intake.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## 🛠️ Technology Stack
+* **Framework:** React Native + Expo (SDK 56+)
+* **Navigation:** Expo Router (File-based routing)
+* **State Management:** Zustand (Global stores for workouts and user profiles)
+* **Database:** Expo SQLite (Native SQLite database wrapper)
+* **Styles:** React Native StyleSheet (custom dark-theme layout system)
+* **Icons & Visuals:** Lucide React Native, Lottie Animations, Expo Image (high-performance GIF caching)
 
-When you're ready, run:
+---
 
+## 🚀 Quick Start & Development
+
+### 1. Install Dependencies
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Prebuild Native Folders
+Since this app uses native modules (SQLite, HealthKit, etc.), you must generate the android/ios folders before running:
+```bash
+npx expo prebuild
+```
 
-### Other setup steps
+### 3. Run Locally (Dev Server)
+To run the bundler and test on an emulator or physical device via Expo Go / Development Build:
+```bash
+npx expo start
+```
+* Press `a` to open on Android Emulator.
+* Press `i` to open on iOS Simulator.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+---
 
-## Learn more
+## 📦 Building for Production (Android APK)
 
-To learn more about developing your project with Expo, look at the following resources:
+We include a custom powershell build script (`build_apk.ps1`) to bypass system Java configuration issues by automatically downloading and using OpenJDK 17.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+To compile a release APK (`app-release.apk`):
+1. Open PowerShell in the project directory.
+2. Run the build script:
+   ```powershell
+   .\build_apk.ps1
+   ```
+3. Once completed, the final APK file will be located at:
+   `android/app/build/outputs/apk/release/app-release.apk`

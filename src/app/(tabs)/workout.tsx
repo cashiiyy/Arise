@@ -11,6 +11,7 @@ import {
   Modal,
   Alert,
   Pressable,
+  TextInput,
 } from 'react-native';
 import { SystemText } from '../../components/SystemText';
 import { SystemCard } from '../../components/SystemCard';
@@ -23,6 +24,7 @@ import { COLORS } from '../../theme';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildProgressionMessage } from '../../ai/progressionEngine';
+import { allExercises } from '../../exercise/exerciseIndex';
 
 const RPE_LABELS: Record<number, string> = {
   1: 'Very Easy', 2: 'Easy', 3: 'Light', 4: 'Moderate',
@@ -50,6 +52,8 @@ export default function Workout() {
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [sessionResult, setSessionResult] = useState<any>(null);
   const [showInfoCard, setShowInfoCard] = useState(false);
+  const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
+  const [exerciseSearchQuery, setExerciseSearchQuery] = useState('');
 
   // Derive rank index from rank letter
   const rankIndexMap: Record<string, number> = { E: 0, D: 2, C: 4, B: 5, A: 6, S: 7 };
@@ -227,6 +231,12 @@ export default function Workout() {
           title="BEGIN SESSION"
           onPress={startSession}
           style={{ marginTop: 24 }}
+        />
+        <SystemButton
+          title="ADD EXERCISE MANUALLY"
+          variant="secondary"
+          onPress={() => setShowAddExerciseModal(true)}
+          style={{ marginTop: 8 }}
         />
         <SystemButton
           title="REGENERATE PLAN"
@@ -450,6 +460,53 @@ export default function Workout() {
               style={{ marginTop: 20 }}
             />
           </SystemCard>
+        </Pressable>
+      </Modal>
+
+      {/* Add Exercise Modal */}
+      <Modal visible={showAddExerciseModal} transparent animationType="slide">
+        <Pressable style={styles.restOverlay} onPress={() => setShowAddExerciseModal(false)}>
+          <Pressable style={[styles.restCard, { backgroundColor: COLORS.background, padding: 20, width: '100%', maxHeight: '80%' }]}>
+            <SystemText variant="h2" style={{ marginBottom: 16 }}>ADD EXERCISE</SystemText>
+            
+            <View style={{ borderWidth: 1, borderColor: COLORS.cardBorder, borderRadius: 8, paddingHorizontal: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
+              <SystemText>🔍</SystemText>
+              <TextInput
+                style={{ flex: 1, color: COLORS.text, paddingVertical: 10, paddingHorizontal: 8, fontFamily: 'SpaceMono' }}
+                placeholder="Search exercise..."
+                placeholderTextColor={COLORS.textMuted}
+                value={exerciseSearchQuery}
+                onChangeText={setExerciseSearchQuery}
+              />
+            </View>
+
+            <ScrollView style={{ flex: 1, width: '100%' }}>
+              {allExercises
+                .filter(e => e.name.toLowerCase().includes(exerciseSearchQuery.toLowerCase()))
+                .slice(0, 20)
+                .map(e => (
+                  <TouchableOpacity
+                    key={e.exerciseId}
+                    style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' }}
+                    onPress={() => {
+                      useWorkoutStore.getState().addExerciseToPlan(e, 3, 10, 0);
+                      setShowAddExerciseModal(false);
+                      setExerciseSearchQuery('');
+                    }}
+                  >
+                    <SystemText>{e.name}</SystemText>
+                    <SystemText variant="muted" style={{ fontSize: 10 }}>{e.targetMuscles.join(', ')}</SystemText>
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
+
+            <SystemButton
+              title="CANCEL"
+              variant="outline"
+              onPress={() => setShowAddExerciseModal(false)}
+              style={{ marginTop: 16, width: '100%' }}
+            />
+          </Pressable>
         </Pressable>
       </Modal>
     </ScrollView>

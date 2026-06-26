@@ -49,6 +49,7 @@ interface WorkoutState {
   setCurrentWeight: (w: number) => void;
   setCurrentReps: (r: number) => void;
   setCurrentRpe: (r: number) => void;
+  addExerciseToPlan: (exercise: any, sets: number, reps: number, weightKg: number) => void;
 }
 
 const makeEmptySession = (): Partial<WorkoutSession> => ({
@@ -273,5 +274,32 @@ export const useWorkoutStore = create<WorkoutState>()(
     setCurrentWeight: (w: number) => set({ currentWeight: Math.max(0, w) }),
     setCurrentReps: (r: number) => set({ currentReps: Math.max(1, r) }),
     setCurrentRpe: (r: number) => set({ currentRpe: Math.max(1, Math.min(10, r)) }),
+
+    addExerciseToPlan: (exercise: any, sets: number, reps: number, weightKg: number) => {
+      const { todaysPlan } = get();
+      if (!todaysPlan) return;
+
+      const newPlannedExercise: PlannedExercise = {
+        exercise,
+        plannedSets: sets,
+        plannedReps: reps,
+        plannedRepRange: `${reps}-${reps + 2}`,
+        recommendedWeightKg: weightKg,
+        restSeconds: exercise.restTime || 90,
+        intensityLevel: 'moderate',
+        estimatedCalories: 50,
+        xpReward: exercise.xpReward || 50,
+        estimatedDurationMin: sets * 2,
+        progressionNote: 'Manually Added',
+      };
+
+      const updatedPlan = {
+        ...todaysPlan,
+        exercises: [...todaysPlan.exercises, newPlannedExercise],
+        totalEstimatedDurationMin: todaysPlan.totalEstimatedDurationMin + (sets * 2),
+      };
+
+      set({ todaysPlan: updatedPlan });
+    },
   })
 );

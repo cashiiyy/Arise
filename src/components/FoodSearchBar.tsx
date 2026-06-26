@@ -119,7 +119,8 @@ export const FoodSearchBar: React.FC<Props> = ({ onLogFood }) => {
           <FlatList
             data={results}
             keyExtractor={item => item.id}
-            scrollEnabled={false}
+            scrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.resultItem}
