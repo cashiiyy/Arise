@@ -7,6 +7,11 @@
     "icon": "./assets/images/icon.png",
     "scheme": "ariseapp",
     "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*",
+      "Exercises/**/*",
+      "Nutrition/**/*.json"
+    ],
     "ios": {
       "icon": "./assets/images/icon.png"
     },
@@ -34,7 +39,8 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

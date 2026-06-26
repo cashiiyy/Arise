@@ -15,10 +15,11 @@ const MACRO_RATIOS: Record<GoalType, { protein: number; carbs: number; fat: numb
 };
 
 export function calcBMR(u: UserProfile): number {
-  if (u.sex === 'male') {
-    return 10 * u.weight_kg + 6.25 * u.height_cm - 5 * u.age + 5;
+  const { weight: weight_kg, height: height_cm, age, sex } = u.biometrics;
+  if (sex === 'male') {
+    return 10 * weight_kg + 6.25 * height_cm - 5 * age + 5;
   }
-  return 10 * u.weight_kg + 6.25 * u.height_cm - 5 * u.age - 161;
+  return 10 * weight_kg + 6.25 * height_cm - 5 * age - 161;
 }
 
 export function activityMultiplier(steps: number): number {
@@ -42,9 +43,9 @@ export function targetCalories(u: UserProfile, bio: BiometricSnapshot): number {
 
 export function calcMacros(u: UserProfile): Macros {
   const ratios = MACRO_RATIOS[u.goal];
-  const protein = Math.round(u.weight_kg * ratios.protein);
-  const carbs = Math.round(u.weight_kg * ratios.carbs);
-  const fat = Math.round(u.weight_kg * ratios.fat);
+  const protein = Math.round(u.biometrics.weight * ratios.protein);
+  const carbs = Math.round(u.biometrics.weight * ratios.carbs);
+  const fat = Math.round(u.biometrics.weight * ratios.fat);
   const totalKcal = protein * 4 + carbs * 4 + fat * 9;
 
   const macros: Macros = {

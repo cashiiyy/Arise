@@ -8,11 +8,20 @@ export interface UserProfile {
   goal: GoalType;
   diet: DietType;
   equipment: string[];
-  weight_kg: number;
-  height_cm: number;
-  age: number;
-  sex: 'male' | 'female';
+  frequency: number;
+  focusAreas: string[];
+  motivation: string;
+  healthIssues: string[];
+  biometrics: {
+    weight: number;
+    height: number;
+    age: number;
+    sex: 'male' | 'female';
+    hrv_baseline: number;
+  };
+  stats: AriseStats;
   rankIndex: number;
+  rank: string;
   xp: number;
   aura: number;
   streak: number;
@@ -127,10 +136,11 @@ export interface OverloadSuggestion {
 }
 
 export interface XPEvent {
-  id: string;
-  date: string;
+  id?: string;
+  date?: string;
   amount: number;
   reason: string;
+  timestamp?: string;
 }
 
 export interface RankUpEvent {
