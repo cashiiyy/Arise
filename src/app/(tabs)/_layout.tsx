@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { COLORS } from '../../theme';
-import { Shield, Dumbbell, Activity, Apple, Moon } from 'lucide-react-native';
+import { Shield, Dumbbell, Activity, Apple, Moon, User } from 'lucide-react-native';
 
 export default function TabsLayout() {
   return (
@@ -49,6 +49,13 @@ export default function TabsLayout() {
         options={{
           title: 'Sleep',
           tabBarIcon: ({ color }) => <Moon color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <User color={color} size={24} />,
         }}
       />
     </Tabs>

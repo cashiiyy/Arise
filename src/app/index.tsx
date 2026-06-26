@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SystemText } from '../components/SystemText';
 import { COLORS } from '../theme';
 
@@ -8,9 +9,22 @@ export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    // Simulate loading/initialization time
+    const checkOnboarding = async () => {
+      try {
+        const completed = await AsyncStorage.getItem('onboarding_completed');
+        if (completed === 'true') {
+          router.replace('/(tabs)');
+        } else {
+          router.replace('/onboarding');
+        }
+      } catch (e) {
+        console.warn('Failed to check onboarding state, redirecting to onboarding:', e);
+        router.replace('/onboarding');
+      }
+    };
+
     const timer = setTimeout(() => {
-      router.replace('/onboarding');
+      checkOnboarding();
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
@@ -40,3 +54,4 @@ const styles = StyleSheet.create({
     letterSpacing: 8,
   }
 });
+

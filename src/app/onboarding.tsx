@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, FlatList } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, Vibration } from 'react-native';
 import { useRouter } from 'expo-router';
-import Animated, { FadeIn, FadeOut, Layout, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing } from 'react-native-reanimated';
-import { ArrowLeft, Check, ChevronUp, ChevronDown, FlaskConical, PencilLine, Droplet, Clock, Calendar, ShieldAlert, Sparkles, TrendingUp, UserCheck } from 'lucide-react-native';
+import Animated, { FadeIn, FadeOut, Layout, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing, runOnJS } from 'react-native-reanimated';
+import { ArrowLeft, Check, ChevronUp, ChevronDown, FlaskConical, PencilLine, Droplet, Clock, Calendar, ShieldAlert, Sparkles, User, Shield } from 'lucide-react-native';
 import { SystemText } from '../components/SystemText';
 import { SystemButton } from '../components/SystemButton';
 import { SystemCard } from '../components/SystemCard';
 import { useUserStore } from '../store/useUserStore';
 import { COLORS, SYSTEM_GLOW } from '../theme';
 import Svg, { Path, Circle, Rect, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -58,10 +59,11 @@ export default function Onboarding() {
   const router = useRouter();
   const setInitialData = useUserStore((state) => state.setInitialData);
 
-  // Onboarding wizard steps (1 to 18)
+  // Onboarding wizard steps (1 to 22)
   const [step, setStep] = useState(1);
 
   // Form State
+  const [playerName, setPlayerName] = useState('Sung Jin-Woo');
   const [motivation, setMotivation] = useState('Health');
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [age, setAge] = useState(24);
@@ -99,13 +101,20 @@ export default function Onboarding() {
   // Calculated RPG attributes
   const stats = {
     STR: 10 + (equipment.includes('Barbells') ? 3 : 1) + (focusAreas.includes('Chest') ? 1 : 0),
-    VIT: 10 + (frequency >= 4 ? 3 : 1) + (motivation === 'Health' ? 1 : 0),
+    END: 10 + (frequency >= 4 ? 3 : 1) + (motivation === 'Enjoyment' ? 2 : 1),
     AGI: 10 + (focusAreas.includes('Legs') ? 2 : 0) + (motivation === 'Appearance' ? 2 : 1),
-    REC: 10 + (healthIssues.includes('None') ? 2 : 0) + (frequency <= 4 ? 2 : 1),
+    VIT: 10 + (healthIssues.includes('None') ? 3 : 1) + (frequency <= 4 ? 2 : 1),
+    INT: 10 + (age > 20 ? 3 : 1) + (motivation === 'Health' ? 2 : 1),
   };
 
-  // Pulse animation for Welcome shadow silhouette
+  // Reanimated shared values
   const auraPulse = useSharedValue(1);
+  const statsAnimProgress = useSharedValue(0);
+  const surveyAnimProgress = useSharedValue(0);
+  const scanSharedProgress = useSharedValue(0);
+  const [isScanning, setIsScanning] = useState(false);
+
+  // Pulse animation for Welcome shadow silhouette
   useEffect(() => {
     auraPulse.value = withRepeat(
       withSequence(
@@ -124,9 +133,37 @@ export default function Onboarding() {
     };
   });
 
-  // Automatic transition for status screen (Step 15)
+  // Reanimated survey header progress bar
+  const totalSurveySteps = 10;
+  const surveyProgress = step >= 3 && step <= 12 ? ((step - 3) / totalSurveySteps) * 100 : 0;
+
   useEffect(() => {
-    if (step === 15) {
+    surveyAnimProgress.value = withTiming(surveyProgress, { duration: 300 });
+  }, [surveyProgress]);
+
+  const surveyProgressStyle = useAnimatedStyle(() => {
+    return {
+      width: `${surveyAnimProgress.value}%`,
+    };
+  });
+
+  // Stats bar animation
+  useEffect(() => {
+    if (step === 17) {
+      statsAnimProgress.value = 0;
+      statsAnimProgress.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.quad) });
+    }
+  }, [step]);
+
+  const animatedBarWidth = (value: number) => {
+    return useAnimatedStyle(() => ({
+      width: `${statsAnimProgress.value * (value / 20) * 100}%`,
+    }));
+  };
+
+  // Automatic transition for status screen (Step 16)
+  useEffect(() => {
+    if (step === 16) {
       setLoadingProgress(0);
       const interval = setInterval(() => {
         setLoadingProgress((prev) => {
@@ -145,28 +182,66 @@ export default function Onboarding() {
             setStatusText('Workout plan locked.');
           } else if (next >= 100) {
             clearInterval(interval);
-            setTimeout(() => setStep(16), 800); // transition to Arise Stats
+            setTimeout(() => setStep(17), 800); // transition to Arise Stats (step 17)
             return 100;
           }
           return next;
         });
-      }, 40);
+      }, 35);
       return () => clearInterval(interval);
     }
   }, [step]);
 
+  // Thumb Scanner handlers
+  const handleScanSuccess = () => {
+    if (Vibration.cancel) {
+      Vibration.cancel();
+    }
+    Vibration.vibrate([0, 150, 50, 400]);
+    setTimeout(() => {
+      handleNext();
+    }, 800);
+  };
+
+  const startScanning = () => {
+    setIsScanning(true);
+    if (Vibration.vibrate) {
+      Vibration.vibrate([100, 100], true);
+    }
+    scanSharedProgress.value = withTiming(1, { duration: 2200, easing: Easing.linear }, (finished) => {
+      if (finished) {
+        runOnJS(handleScanSuccess)();
+      }
+    });
+  };
+
+  const stopScanning = () => {
+    setIsScanning(false);
+    if (Vibration.cancel) {
+      Vibration.cancel();
+    }
+    if (scanSharedProgress.value < 1) {
+      scanSharedProgress.value = withTiming(0, { duration: 400 });
+    }
+  };
+
+  const scanFillStyle = useAnimatedStyle(() => {
+    const scale = scanSharedProgress.value * 9;
+    const opacity = scanSharedProgress.value;
+    return {
+      transform: [{ scale }],
+      opacity: Math.min(1, opacity * 1.3),
+    };
+  });
+
   const handleNext = () => setStep((s) => s + 1);
   const handleBack = () => setStep((s) => Math.max(1, s - 1));
 
-  // Progress Bar percentage
-  const totalSurveySteps = 11;
-  const surveyProgress = step >= 3 && step <= 13 ? ((step - 3) / totalSurveySteps) * 100 : 0;
-
-  // Onboarding UI Rendering helper methods
+  // Onboarding UI Rendering Helper Methods
 
   // 1. Splash Welcome Screen
   const renderStep1 = () => (
-    <View style={styles.welcomeContainer}>
+    <Animated.View entering={FadeIn.duration(400)} style={styles.welcomeContainer}>
       {/* Background Silhouette Blue Shadow Aura */}
       <Animated.View style={[styles.silhouetteAura, animatedAuraStyle]}>
         <Svg width="350" height="350" viewBox="0 0 100 100">
@@ -182,21 +257,28 @@ export default function Onboarding() {
       </View>
 
       <View style={styles.welcomeCenter}>
-        <SystemText variant="h1" align="center" style={styles.giantTitle}>ARIS</SystemText>
-        <SystemText variant="h1" align="center" style={[styles.giantTitle, { marginTop: -15 }]}>E</SystemText>
+        <SystemText 
+          variant="h1" 
+          align="center" 
+          adjustsFontSizeToFit 
+          numberOfLines={1} 
+          style={styles.giantTitle}
+        >
+          ARISE
+        </SystemText>
         <SystemText variant="muted" align="center" style={styles.welcomeSubtitle}>
           Level Up In Real Life
         </SystemText>
       </View>
 
       <SystemButton title="Get Started »" onPress={handleNext} />
-    </View>
+    </Animated.View>
   );
 
   // 2. Class Acquisition System Notification Box
   const renderStep2 = () => (
     <View style={styles.centerBoxContainer}>
-      <Animated.View entering={FadeIn} style={[styles.systemNotification, SYSTEM_GLOW]}>
+      <Animated.View entering={FadeIn.duration(500)} style={[styles.systemNotification, SYSTEM_GLOW]}>
         <View style={styles.notifHeader}>
           <ShieldAlert size={28} color="#FFFFFF" style={{ marginRight: 10 }} />
           <SystemText variant="h2" color="#FFFFFF">NOTIFICATION</SystemText>
@@ -215,11 +297,45 @@ export default function Onboarding() {
     </View>
   );
 
-  // 3. Motivation Screen
-  const renderStep3 = () => {
+  // 3. Enter Name Screen (New)
+  const renderStep3 = () => (
+    <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}>
+        <View>
+          <SystemText variant="h2" align="center" style={styles.surveyTitle}>
+            How shall the System{"\n"}address you, Hunter?
+          </SystemText>
+          
+          <SystemCard glow style={{ marginTop: 40, padding: 20 }}>
+            <SystemText variant="mono" style={{ fontSize: 11, color: COLORS.primary, marginBottom: 8 }}>PLAYER DESIGNATION</SystemText>
+            <TextInput
+              value={playerName}
+              onChangeText={setPlayerName}
+              placeholder="Enter name..."
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              style={styles.nameInput}
+            />
+            <SystemText variant="muted" style={{ fontSize: 10, marginTop: 12 }}>
+              This moniker will be bound to your stats board.
+            </SystemText>
+          </SystemCard>
+        </View>
+
+        <SystemButton
+          title="Confirm Code Name"
+          onPress={handleNext}
+          disabled={!playerName.trim()}
+          style={{ marginTop: 20 }}
+        />
+      </ScrollView>
+    </Animated.View>
+  );
+
+  // 4. Motivation Screen
+  const renderStep4 = () => {
     const motivations = ['Health', 'Weight Loss', 'Appearance', 'Stress Relief', 'Social Support', 'Enjoyment'];
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h2" align="center" style={styles.surveyTitle}>
           What motivates you to{"\n"}work out?
         </SystemText>
@@ -245,21 +361,42 @@ export default function Onboarding() {
         </ScrollView>
 
         <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 4. Muscle Focus Areas Screen
-  const renderStep4 = () => {
-    const areas = ['Chest', 'Back', 'Arms', 'Shoulders', 'Abs', 'Legs', 'Glutes'];
+  // 5. Muscle Focus Areas Screen
+  const renderStep5 = () => {
+    const areas = ['Full Body', 'Chest', 'Back', 'Arms', 'Shoulders', 'Abs', 'Legs', 'Glutes'];
     const toggleArea = (area: string) => {
-      setFocusAreas((prev) => 
-        prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area]
-      );
+      const subAreas = ['Chest', 'Back', 'Arms', 'Shoulders', 'Abs', 'Legs', 'Glutes'];
+      if (area === 'Full Body') {
+        if (focusAreas.includes('Full Body')) {
+          setFocusAreas([]);
+        } else {
+          setFocusAreas(['Full Body', ...subAreas]);
+        }
+      } else {
+        setFocusAreas((prev) => {
+          let updated: string[];
+          if (prev.includes(area)) {
+            updated = prev.filter((a) => a !== area && a !== 'Full Body');
+          } else {
+            const nextTemp = [...prev, area];
+            const allSelected = subAreas.every((sa) => nextTemp.includes(sa));
+            if (allSelected) {
+              updated = ['Full Body', ...subAreas];
+            } else {
+              updated = nextTemp;
+            }
+          }
+          return updated;
+        });
+      }
     };
 
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h2" align="center" style={styles.surveyTitle}>
           Choose your focus areas
         </SystemText>
@@ -272,34 +409,34 @@ export default function Onboarding() {
                 key={area}
                 style={[
                   styles.optionCard,
-                  isSelected && styles.focusCardSelected
+                  isSelected && (area === 'Full Body' ? styles.optionCardSelected : styles.focusCardSelected)
                 ]}
                 onPress={() => toggleArea(area)}
               >
                 <View style={[styles.checkboxCircle, isSelected && styles.checkboxCircleSelected]}>
                   {isSelected && <Check size={14} color={COLORS.background} />}
                 </View>
-                <SystemText variant="body" color={isSelected ? '#10B981' : '#FFFFFF'} style={{ fontWeight: '600', flex: 1 }}>
+                <SystemText variant="body" color={isSelected ? (area === 'Full Body' ? COLORS.primary : '#10B981') : '#FFFFFF'} style={{ fontWeight: '600', flex: 1 }}>
                   {area}
                 </SystemText>
-                <MuscleHighlightIcon muscle={area.toLowerCase()} active={isSelected} />
+                {area !== 'Full Body' && <MuscleHighlightIcon muscle={area.toLowerCase()} active={isSelected} />}
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
         <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 5. Age Picker Screen
-  const renderStep5 = () => {
+  // 6. Age Picker Screen
+  const renderStep6 = () => {
     const handleIncrement = () => setAge((prev) => Math.min(100, prev + 1));
     const handleDecrement = () => setAge((prev) => Math.max(10, prev - 1));
 
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h2" align="center" style={styles.surveyTitle}>
           How old are you?
         </SystemText>
@@ -319,231 +456,243 @@ export default function Onboarding() {
         </View>
 
         <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 6. Height Picker Screen
-  const renderStep6 = () => {
+  // 7. Height Picker Screen
+  const renderStep7 = () => {
     const handleIncrement = () => setHeight((prev) => prev + 1);
     const handleDecrement = () => setHeight((prev) => Math.max(50, prev - 1));
 
     return (
-      <View style={styles.surveyContainer}>
-        <SystemText variant="h2" align="center" style={styles.surveyTitle}>
-          How tall are you?
-        </SystemText>
-
-        <View style={styles.pickerSection}>
-          <TouchableOpacity onPress={handleDecrement} style={styles.pickerArrow}>
-            <ChevronUp size={36} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
-          <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
-            {height - 1} {heightUnit}
-          </SystemText>
-          <View style={styles.pickerFocusBox}>
-            <SystemText variant="h1" align="center" style={{ fontSize: 32, fontWeight: 'bold' }}>
-              {height} {heightUnit}
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}>
+          <View>
+            <SystemText variant="h2" align="center" style={styles.surveyTitle}>
+              How tall are you?
             </SystemText>
-          </View>
-          <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
-            {height + 1} {heightUnit}
-          </SystemText>
-          <TouchableOpacity onPress={handleIncrement} style={styles.pickerArrow}>
-            <ChevronDown size={36} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
-        </View>
 
-        {/* Height Unit Toggle Switch */}
-        <View style={styles.unitToggleRow}>
-          <TouchableOpacity 
-            onPress={() => {
-              if (heightUnit === 'ft') {
-                setHeight(Math.round(height * 30.48));
-                setHeightUnit('cm');
-              }
-            }}
-            style={styles.unitToggleLabel}
-          >
-            <SystemText variant="mono" color={heightUnit === 'cm' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>cm</SystemText>
-          </TouchableOpacity>
-          <View style={styles.switchTrack}>
-            <TouchableOpacity 
-              onPress={() => {
-                const newUnit = heightUnit === 'cm' ? 'ft' : 'cm';
-                const newVal = newUnit === 'ft' ? Math.round(height / 30.48) : Math.round(height * 30.48);
-                setHeightUnit(newUnit);
-                setHeight(newVal);
-              }}
-              style={[styles.switchThumb, { alignSelf: heightUnit === 'cm' ? 'flex-start' : 'flex-end' }]} 
-            />
-          </View>
-          <TouchableOpacity 
-            onPress={() => {
-              if (heightUnit === 'cm') {
-                setHeight(Math.round(height / 30.48));
-                setHeightUnit('ft');
-              }
-            }}
-            style={styles.unitToggleLabel}
-          >
-            <SystemText variant="mono" color={heightUnit === 'ft' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>ft</SystemText>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.pickerSection}>
+              <TouchableOpacity onPress={handleDecrement} style={styles.pickerArrow}>
+                <ChevronUp size={36} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
+              <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
+                {height - 1} {heightUnit}
+              </SystemText>
+              <View style={styles.pickerFocusBox}>
+                <SystemText variant="h1" align="center" style={{ fontSize: 32, fontWeight: 'bold' }}>
+                  {height} {heightUnit}
+                </SystemText>
+              </View>
+              <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
+                {height + 1} {heightUnit}
+              </SystemText>
+              <TouchableOpacity onPress={handleIncrement} style={styles.pickerArrow}>
+                <ChevronDown size={36} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
+            </View>
 
-        <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+            {/* Height Unit Toggle Switch */}
+            <View style={styles.unitToggleRow}>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (heightUnit === 'ft') {
+                    setHeight(Math.round(height * 30.48));
+                    setHeightUnit('cm');
+                  }
+                }}
+                style={styles.unitToggleLabel}
+              >
+                <SystemText variant="mono" color={heightUnit === 'cm' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>cm</SystemText>
+              </TouchableOpacity>
+              <View style={styles.switchTrack}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    const newUnit = heightUnit === 'cm' ? 'ft' : 'cm';
+                    const newVal = newUnit === 'ft' ? Math.round(height / 30.48) : Math.round(height * 30.48);
+                    setHeightUnit(newUnit);
+                    setHeight(newVal);
+                  }}
+                  style={[styles.switchThumb, { alignSelf: heightUnit === 'cm' ? 'flex-start' : 'flex-end' }]} 
+                />
+              </View>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (heightUnit === 'cm') {
+                    setHeight(Math.round(height / 30.48));
+                    setHeightUnit('ft');
+                  }
+                }}
+                style={styles.unitToggleLabel}
+              >
+                <SystemText variant="mono" color={heightUnit === 'ft' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>ft</SystemText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <SystemButton title="Continue" onPress={handleNext} style={{ marginTop: 20 }} />
+        </ScrollView>
+      </Animated.View>
     );
   };
 
-  // 7. Current Weight Picker Screen
-  const renderStep7 = () => {
+  // 8. Current Weight Picker Screen
+  const renderStep8 = () => {
     const handleIncrement = () => setWeight((prev) => prev + 1);
     const handleDecrement = () => setWeight((prev) => Math.max(20, prev - 1));
 
     return (
-      <View style={styles.surveyContainer}>
-        <SystemText variant="h2" align="center" style={styles.surveyTitle}>
-          What is your current{"\n"}weight?
-        </SystemText>
-
-        <View style={styles.pickerSection}>
-          <TouchableOpacity onPress={handleDecrement} style={styles.pickerArrow}>
-            <ChevronUp size={36} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
-          <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
-            {weight - 1} {weightUnit}
-          </SystemText>
-          <View style={styles.pickerFocusBox}>
-            <SystemText variant="h1" align="center" style={{ fontSize: 32, fontWeight: 'bold' }}>
-              {weight} {weightUnit}
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}>
+          <View>
+            <SystemText variant="h2" align="center" style={styles.surveyTitle}>
+              What is your current{"\n"}weight?
             </SystemText>
-          </View>
-          <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
-            {weight + 1} {weightUnit}
-          </SystemText>
-          <TouchableOpacity onPress={handleIncrement} style={styles.pickerArrow}>
-            <ChevronDown size={36} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
-        </View>
 
-        {/* Weight Unit Toggle Switch */}
-        <View style={styles.unitToggleRow}>
-          <TouchableOpacity 
-            onPress={() => {
-              if (weightUnit === 'lbs') {
-                setWeight(Math.round(weight * 0.453592));
-                setWeightUnit('kg');
-              }
-            }}
-            style={styles.unitToggleLabel}
-          >
-            <SystemText variant="mono" color={weightUnit === 'kg' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>kg</SystemText>
-          </TouchableOpacity>
-          <View style={styles.switchTrack}>
-            <TouchableOpacity 
-              onPress={() => {
-                const newUnit = weightUnit === 'kg' ? 'lbs' : 'kg';
-                const newVal = newUnit === 'lbs' ? Math.round(weight / 0.453592) : Math.round(weight * 0.453592);
-                setWeightUnit(newUnit);
-                setWeight(newVal);
-              }}
-              style={[styles.switchThumb, { alignSelf: weightUnit === 'kg' ? 'flex-start' : 'flex-end' }]} 
-            />
-          </View>
-          <TouchableOpacity 
-            onPress={() => {
-              if (weightUnit === 'kg') {
-                setWeight(Math.round(weight / 0.453592));
-                setWeightUnit('lbs');
-              }
-            }}
-            style={styles.unitToggleLabel}
-          >
-            <SystemText variant="mono" color={weightUnit === 'lbs' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>lbs</SystemText>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.pickerSection}>
+              <TouchableOpacity onPress={handleDecrement} style={styles.pickerArrow}>
+                <ChevronUp size={36} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
+              <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
+                {weight - 1} {weightUnit}
+              </SystemText>
+              <View style={styles.pickerFocusBox}>
+                <SystemText variant="h1" align="center" style={{ fontSize: 32, fontWeight: 'bold' }}>
+                  {weight} {weightUnit}
+                </SystemText>
+              </View>
+              <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
+                {weight + 1} {weightUnit}
+              </SystemText>
+              <TouchableOpacity onPress={handleIncrement} style={styles.pickerArrow}>
+                <ChevronDown size={36} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
+            </View>
 
-        <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+            {/* Weight Unit Toggle Switch */}
+            <View style={styles.unitToggleRow}>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (weightUnit === 'lbs') {
+                    setWeight(Math.round(weight * 0.453592));
+                    setWeightUnit('kg');
+                  }
+                }}
+                style={styles.unitToggleLabel}
+              >
+                <SystemText variant="mono" color={weightUnit === 'kg' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>kg</SystemText>
+              </TouchableOpacity>
+              <View style={styles.switchTrack}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    const newUnit = weightUnit === 'kg' ? 'lbs' : 'kg';
+                    const newVal = newUnit === 'lbs' ? Math.round(weight / 0.453592) : Math.round(weight * 0.453592);
+                    setWeightUnit(newUnit);
+                    setWeight(newVal);
+                  }}
+                  style={[styles.switchThumb, { alignSelf: weightUnit === 'kg' ? 'flex-start' : 'flex-end' }]} 
+                />
+              </View>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (weightUnit === 'kg') {
+                    setWeight(Math.round(weight / 0.453592));
+                    setWeightUnit('lbs');
+                  }
+                }}
+                style={styles.unitToggleLabel}
+              >
+                <SystemText variant="mono" color={weightUnit === 'lbs' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>lbs</SystemText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <SystemButton title="Continue" onPress={handleNext} style={{ marginTop: 20 }} />
+        </ScrollView>
+      </Animated.View>
     );
   };
 
-  // 8. Target Weight Picker Screen
-  const renderStep8 = () => {
+  // 9. Target Weight Picker Screen
+  const renderStep9 = () => {
     const handleIncrement = () => setTargetWeight((prev) => prev + 1);
     const handleDecrement = () => setTargetWeight((prev) => Math.max(20, prev - 1));
 
     return (
-      <View style={styles.surveyContainer}>
-        <SystemText variant="h2" align="center" style={styles.surveyTitle}>
-          What is your target{"\n"}weight?
-        </SystemText>
-
-        <View style={styles.pickerSection}>
-          <TouchableOpacity onPress={handleDecrement} style={styles.pickerArrow}>
-            <ChevronUp size={36} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
-          <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
-            {targetWeight - 1} {targetWeightUnit}
-          </SystemText>
-          <View style={styles.pickerFocusBox}>
-            <SystemText variant="h1" align="center" style={{ fontSize: 32, fontWeight: 'bold' }}>
-              {targetWeight} {targetWeightUnit}
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}>
+          <View>
+            <SystemText variant="h2" align="center" style={styles.surveyTitle}>
+              What is your target{"\n"}weight?
             </SystemText>
-          </View>
-          <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
-            {targetWeight + 1} {targetWeightUnit}
-          </SystemText>
-          <TouchableOpacity onPress={handleIncrement} style={styles.pickerArrow}>
-            <ChevronDown size={36} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
-        </View>
 
-        {/* Target Weight Unit Toggle Switch */}
-        <View style={styles.unitToggleRow}>
-          <TouchableOpacity 
-            onPress={() => {
-              if (targetWeightUnit === 'lbs') {
-                setTargetWeight(Math.round(targetWeight * 0.453592));
-                setTargetWeightUnit('kg');
-              }
-            }}
-            style={styles.unitToggleLabel}
-          >
-            <SystemText variant="mono" color={targetWeightUnit === 'kg' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>kg</SystemText>
-          </TouchableOpacity>
-          <View style={styles.switchTrack}>
-            <TouchableOpacity 
-              onPress={() => {
-                const newUnit = targetWeightUnit === 'kg' ? 'lbs' : 'kg';
-                const newVal = newUnit === 'lbs' ? Math.round(targetWeight / 0.453592) : Math.round(targetWeight * 0.453592);
-                setTargetWeightUnit(newUnit);
-                setTargetWeight(newVal);
-              }}
-              style={[styles.switchThumb, { alignSelf: targetWeightUnit === 'kg' ? 'flex-start' : 'flex-end' }]} 
-            />
-          </View>
-          <TouchableOpacity 
-            onPress={() => {
-              if (targetWeightUnit === 'kg') {
-                setTargetWeight(Math.round(targetWeight / 0.453592));
-                setTargetWeightUnit('lbs');
-              }
-            }}
-            style={styles.unitToggleLabel}
-          >
-            <SystemText variant="mono" color={targetWeightUnit === 'lbs' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>lbs</SystemText>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.pickerSection}>
+              <TouchableOpacity onPress={handleDecrement} style={styles.pickerArrow}>
+                <ChevronUp size={36} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
+              <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
+                {targetWeight - 1} {targetWeightUnit}
+              </SystemText>
+              <View style={styles.pickerFocusBox}>
+                <SystemText variant="h1" align="center" style={{ fontSize: 32, fontWeight: 'bold' }}>
+                  {targetWeight} {targetWeightUnit}
+                </SystemText>
+              </View>
+              <SystemText variant="muted" align="center" style={styles.pickerDimmedText}>
+                {targetWeight + 1} {targetWeightUnit}
+              </SystemText>
+              <TouchableOpacity onPress={handleIncrement} style={styles.pickerArrow}>
+                <ChevronDown size={36} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
+            </View>
 
-        <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+            {/* Target Weight Unit Toggle Switch */}
+            <View style={styles.unitToggleRow}>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (targetWeightUnit === 'lbs') {
+                    setTargetWeight(Math.round(targetWeight * 0.453592));
+                    setTargetWeightUnit('kg');
+                  }
+                }}
+                style={styles.unitToggleLabel}
+              >
+                <SystemText variant="mono" color={targetWeightUnit === 'kg' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>kg</SystemText>
+              </TouchableOpacity>
+              <View style={styles.switchTrack}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    const newUnit = targetWeightUnit === 'kg' ? 'lbs' : 'kg';
+                    const newVal = newUnit === 'lbs' ? Math.round(targetWeight / 0.453592) : Math.round(targetWeight * 0.453592);
+                    setTargetWeightUnit(newUnit);
+                    setTargetWeight(newVal);
+                  }}
+                  style={[styles.switchThumb, { alignSelf: targetWeightUnit === 'kg' ? 'flex-start' : 'flex-end' }]} 
+                />
+              </View>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (targetWeightUnit === 'kg') {
+                    setTargetWeight(Math.round(targetWeight / 0.453592));
+                    setTargetWeightUnit('lbs');
+                  }
+                }}
+                style={styles.unitToggleLabel}
+              >
+                <SystemText variant="mono" color={targetWeightUnit === 'lbs' ? COLORS.primary : 'rgba(255,255,255,0.4)'}>lbs</SystemText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <SystemButton title="Continue" onPress={handleNext} style={{ marginTop: 20 }} />
+        </ScrollView>
+      </Animated.View>
     );
   };
 
-  // 9. Health Issues Checklist
-  const renderStep9 = () => {
+  // 10. Health Issues Checklist
+  const renderStep10 = () => {
     const issues = ['None', 'Knee', 'Hip Joints', 'Back or Hernia', 'Arms and Shoulders', 'Cant Do Jumps'];
     const toggleIssue = (issue: string) => {
       if (issue === 'None') {
@@ -557,7 +706,7 @@ export default function Onboarding() {
     };
 
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h2" align="center" style={styles.surveyTitle}>
           Any health issues?
         </SystemText>
@@ -583,26 +732,47 @@ export default function Onboarding() {
         </ScrollView>
 
         <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 10. Equipment checklist
-  const renderStep10 = () => {
+  // 11. Equipment checklist
+  const renderStep11 = () => {
     const items = ['None (Bodyweight)', 'Full gym', 'Barbells', 'Dumbbells', 'Kettlebells', 'Machines'];
     const toggleEquipment = (item: string) => {
+      const gearOptions = ['Barbells', 'Dumbbells', 'Kettlebells', 'Machines'];
+      const allGearWithGym = ['Full gym', ...gearOptions];
+      
       if (item === 'None (Bodyweight)') {
-        setEquipment(['None (Bodyweight)']);
+        setEquipment((prev) => prev.includes('None (Bodyweight)') ? [] : ['None (Bodyweight)']);
+      } else if (item === 'Full gym') {
+        if (equipment.includes('Full gym')) {
+          setEquipment([]);
+        } else {
+          setEquipment(allGearWithGym);
+        }
       } else {
         setEquipment((prev) => {
-          const filtered = prev.filter((i) => i !== 'None (Bodyweight)');
-          return filtered.includes(item) ? filtered.filter((i) => i !== item) : [...filtered, item];
+          let updated: string[];
+          if (prev.includes(item)) {
+            updated = prev.filter((i) => i !== item && i !== 'Full gym' && i !== 'None (Bodyweight)');
+          } else {
+            const nextTemp = prev.filter((i) => i !== 'None (Bodyweight)');
+            nextTemp.push(item);
+            const allSelected = gearOptions.every((g) => nextTemp.includes(g));
+            if (allSelected) {
+              updated = allGearWithGym;
+            } else {
+              updated = nextTemp;
+            }
+          }
+          return updated;
         });
       }
     };
 
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h2" align="center" style={styles.surveyTitle}>
           What equipment do you{"\n"}have access to?
         </SystemText>
@@ -628,14 +798,14 @@ export default function Onboarding() {
         </ScrollView>
 
         <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 11. Workout Frequency Slider
-  const renderStep11 = () => {
+  // 12. Workout Frequency Slider
+  const renderStep12 = () => {
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h2" align="center" style={styles.surveyTitle}>
           How often would you{"\n"}like to work out?
         </SystemText>
@@ -675,14 +845,14 @@ export default function Onboarding() {
         </View>
 
         <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 12. Summary Preview
-  const renderStep12 = () => {
+  // 13. Summary Preview
+  const renderStep13 = () => {
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h2" align="center" style={styles.surveyTitle}>
           Here's your summary{"\n"}preview. Tap continue to get{"\n"}your custom plan
         </SystemText>
@@ -759,14 +929,14 @@ export default function Onboarding() {
         </ScrollView>
 
         <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 13. Additional Recommendations
-  const renderStep13 = () => {
+  // 14. Additional Recommendations
+  const renderStep14 = () => {
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         {/* Top Weekly Goal Header */}
         <SystemCard glow={false} style={{ marginVertical: 0, paddingVertical: 12, alignItems: 'center' }}>
           <SystemText variant="h2" style={{ fontWeight: 'bold' }}>{frequency} workouts</SystemText>
@@ -802,14 +972,13 @@ export default function Onboarding() {
         </ScrollView>
 
         <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 14. Calendar Day Grid Generation
-  const renderStep14 = () => {
+  // 15. Calendar Day Grid Generation
+  const renderStep15 = () => {
     const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    // Mark workout days: e.g. distribute workouts based on frequency
     const getWorkoutDayIndices = (freq: number) => {
       if (freq === 1) return [1];
       if (freq === 2) return [1, 4];
@@ -823,7 +992,7 @@ export default function Onboarding() {
     const workoutIndices = getWorkoutDayIndices(frequency);
 
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h2" align="center" style={styles.surveyTitle}>
           All done! <Check size={18} color="#10B981" />
         </SystemText>
@@ -833,14 +1002,12 @@ export default function Onboarding() {
 
         {/* 4x7 grid showing workout days */}
         <View style={styles.calendarGrid}>
-          {/* Calendar Headers */}
           <View style={styles.calendarRow}>
             {days.map((day, idx) => (
               <SystemText key={`head-${idx}`} variant="mono" style={styles.calendarDayHeader}>{day}</SystemText>
             ))}
           </View>
 
-          {/* Grid Rows representing 4 weeks of workout slots */}
           {[...Array(4)].map((_, weekIdx) => (
             <View key={`week-${weekIdx}`} style={styles.calendarRow}>
               {days.map((_, dayIdx) => {
@@ -848,7 +1015,6 @@ export default function Onboarding() {
                 return (
                   <View key={`day-${weekIdx}-${dayIdx}`} style={styles.calendarCell}>
                     {isWorkout ? (
-                      // Scroll/Document icon to represent planned workout slot
                       <Calendar size={18} color={COLORS.primary} style={{ opacity: 0.8 }} />
                     ) : (
                       <View style={styles.calendarEmptyCell} />
@@ -861,14 +1027,14 @@ export default function Onboarding() {
         </View>
 
         <SystemButton title="Continue" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 15. Plan Generation Status Progress Screen
-  const renderStep15 = () => {
+  // 16. Plan Generation Status Progress Screen
+  const renderStep16 = () => {
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h1" align="center" style={{ fontSize: 48, fontWeight: 'bold', color: COLORS.primary, marginBottom: 12 }}>
           {loadingProgress}%
         </SystemText>
@@ -915,14 +1081,14 @@ export default function Onboarding() {
         <View style={styles.generatingFooter}>
           <SystemText variant="muted" style={{ fontSize: 12 }}>Over 100,000+ Programs Generated</SystemText>
         </View>
-      </View>
+      </Animated.View>
     );
   };
 
-  // 16. RPG Stats Cards
-  const renderStep16 = () => {
+  // 17. RPG Stats Cards
+  const renderStep17 = () => {
     return (
-      <View style={styles.surveyContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <SystemText variant="h2" align="center" style={{ fontWeight: 'bold', marginBottom: 12 }}>
           Your Arise Stats
         </SystemText>
@@ -937,9 +1103,8 @@ export default function Onboarding() {
               <SystemText variant="body">Strength</SystemText>
               <SystemText variant="h2" color="#EF4444" style={{ fontWeight: 'bold' }}>{stats.STR}</SystemText>
             </View>
-            {/* Stat bar fill */}
             <View style={styles.statBarTrack}>
-              <View style={[styles.statBarFill, { width: `${(stats.STR / 20) * 100}%` }]} />
+              <Animated.View style={[styles.statBarFill, animatedBarWidth(stats.STR)]} />
             </View>
           </SystemCard>
 
@@ -949,7 +1114,7 @@ export default function Onboarding() {
               <SystemText variant="h2" color="#EF4444" style={{ fontWeight: 'bold' }}>{stats.VIT}</SystemText>
             </View>
             <View style={styles.statBarTrack}>
-              <View style={[styles.statBarFill, { width: `${(stats.VIT / 20) * 100}%` }]} />
+              <Animated.View style={[styles.statBarFill, animatedBarWidth(stats.VIT)]} />
             </View>
           </SystemCard>
 
@@ -959,40 +1124,37 @@ export default function Onboarding() {
               <SystemText variant="h2" color="#EF4444" style={{ fontWeight: 'bold' }}>{stats.AGI}</SystemText>
             </View>
             <View style={styles.statBarTrack}>
-              <View style={[styles.statBarFill, { width: `${(stats.AGI / 20) * 100}%` }]} />
+              <Animated.View style={[styles.statBarFill, animatedBarWidth(stats.AGI)]} />
             </View>
           </SystemCard>
 
           <SystemCard glow={false} style={styles.statBox}>
             <View style={styles.statBoxHeader}>
-              <SystemText variant="body">Recovery</SystemText>
-              <SystemText variant="h2" color="#EF4444" style={{ fontWeight: 'bold' }}>{stats.REC}</SystemText>
+              <SystemText variant="body">Endurance</SystemText>
+              <SystemText variant="h2" color="#EF4444" style={{ fontWeight: 'bold' }}>{stats.END}</SystemText>
             </View>
             <View style={styles.statBarTrack}>
-              <View style={[styles.statBarFill, { width: `${(stats.REC / 20) * 100}%` }]} />
+              <Animated.View style={[styles.statBarFill, animatedBarWidth(stats.END)]} />
             </View>
           </SystemCard>
         </View>
 
         <SystemButton title="Show Potential" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 17. Potential Growth Chart
-  const renderStep17 = () => {
+  // 18. Potential Growth Chart
+  const renderStep18 = () => {
     return (
-      <View style={styles.surveyContainer}>
-        {/* SVG chart comparing growth with vs without Arise */}
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <View style={styles.potentialChartContainer}>
           <Svg width="100%" height="150">
-            {/* Grid labels */}
             <Line x1="40" y1="10" x2="300" y2="10" stroke="rgba(255,255,255,0.05)" />
             <Line x1="40" y1="50" x2="300" y2="50" stroke="rgba(255,255,255,0.05)" />
             <Line x1="40" y1="90" x2="300" y2="90" stroke="rgba(255,255,255,0.05)" />
             <Line x1="40" y1="130" x2="300" y2="130" stroke="rgba(255,255,255,0.05)" />
             
-            {/* Y axis ticks (S, A, B, C, D) */}
             <Rect x="10" y="10" width="20" height="15" fill="none" />
             <Line x1="35" y1="130" x2="35" y2="10" stroke="rgba(255,255,255,0.1)" />
 
@@ -1000,15 +1162,12 @@ export default function Onboarding() {
               <Line x1="35" y1="130" x2="280" y2="130" stroke="none" />
             </Svg>
             
-            {/* Plot lines */}
-            {/* Plan/Arise line (green) */}
             <Path
               d="M40,125 Q120,70 190,30 T280,10"
               fill="none"
               stroke="#10B981"
               strokeWidth="3"
             />
-            {/* Flat without Arise line (gray) */}
             <Path
               d="M40,125 L120,115 L200,112 L280,118"
               fill="none"
@@ -1017,15 +1176,12 @@ export default function Onboarding() {
               opacity="0.8"
             />
 
-            {/* Custom tick labels positioned manually */}
-            {/* Ticks: D, C, B, A */}
             <Svg>
               <Circle cx="190" cy="30" r="5" fill="#10B981" />
               <Line x1="190" y1="30" x2="190" y2="130" stroke="#10B981" strokeDasharray="3 3" />
             </Svg>
           </Svg>
           
-          {/* Label helpers overlaid on top */}
           <SystemText variant="mono" style={{ position: 'absolute', left: 15, top: 10, fontSize: 10 }}>D</SystemText>
           <SystemText variant="mono" style={{ position: 'absolute', left: 15, top: 50, fontSize: 10 }}>C</SystemText>
           <SystemText variant="mono" style={{ position: 'absolute', left: 15, top: 90, fontSize: 10 }}>B</SystemText>
@@ -1079,20 +1235,17 @@ export default function Onboarding() {
         </ScrollView>
 
         <SystemButton title="Unlock My Potential" onPress={handleNext} />
-      </View>
+      </Animated.View>
     );
   };
 
-  // 18. Awakening Belief Question
-  const renderStep18 = () => {
+  // 19. Awakening Belief Question
+  const renderStep19 = () => {
     return (
-      <View style={styles.welcomeContainer}>
-        {/* Background Dungeon Silhouette */}
+      <Animated.View entering={FadeIn.duration(400)} style={styles.welcomeContainer}>
         <View style={styles.dungeonSilhouette}>
           <Svg width="100%" height="240" viewBox="0 0 100 100">
-            {/* Giant cathedral pillared vaults */}
             <Path d="M10 90 V20 H25 V90 M30 90 V10 H45 V90 M55 90 V10 H70 V90 M75 90 V20 H90 V90" stroke="rgba(255,255,255,0.06)" strokeWidth="1" fill="none" />
-            {/* Human silhouette kneeling with sword */}
             <Path d="M45 80 L52 60 H56 L62 80 M52 68 H58 M54 58 L54 75" stroke="#00BFFF" strokeWidth="2" fill="none" />
             <Circle cx="54" cy="55" r="3" fill="#00BFFF" />
           </Svg>
@@ -1123,14 +1276,14 @@ export default function Onboarding() {
             <SystemText variant="h2" color={COLORS.background} style={{ fontWeight: 'bold' }}>Yes</SystemText>
           </TouchableOpacity>
         </View>
-      </View>
+      </Animated.View>
     );
   };
 
-  // 19. Google Account Authentication
-  const renderStep19 = () => {
+  // 20. Google Account Authentication
+  const renderStep20 = () => {
     return (
-      <View style={styles.welcomeContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.welcomeContainer}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <SystemText variant="h2" style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>
             Sign in to save your data
@@ -1139,16 +1292,13 @@ export default function Onboarding() {
             <SystemText variant="muted" style={{ textDecorationLine: 'underline' }}>Or skip for now</SystemText>
           </TouchableOpacity>
 
-          {/* Character illustration pointing to SAVING DATA... HUD */}
           <View style={styles.hudIllustrationContainer}>
-            {/* Glowing HUD panel */}
             <View style={[styles.hudPanel, SYSTEM_GLOW]}>
               <View style={styles.hudSpinner} />
               <SystemText variant="mono" style={{ fontSize: 13, color: COLORS.primary, fontWeight: 'bold' }}>
                 SAVING DATA...
               </SystemText>
             </View>
-            {/* Human outline pointer */}
             <Svg width="150" height="150" viewBox="0 0 100 100" style={{ marginTop: 10 }}>
               <Path d="M10 80 Q30 50 45 40 L45 25 H55 L55 40 Q70 50 90 80" stroke="rgba(255,255,255,0.2)" strokeWidth="3" fill="none" />
               <Circle cx="50" cy="18" r="7" fill="rgba(255,255,255,0.2)" />
@@ -1164,19 +1314,61 @@ export default function Onboarding() {
             By continuing, you agree to our <SystemText variant="muted" color={COLORS.primary} style={{ fontSize: 10 }}>Terms</SystemText> and <SystemText variant="muted" color={COLORS.primary} style={{ fontSize: 10 }}>Privacy Policy</SystemText>
           </SystemText>
         </View>
-      </View>
+      </Animated.View>
     );
   };
 
-  // 20. Awakening Program Final Summary & Launch
-  const renderStep20 = () => {
-    // Generate program name/details based on focus areas and equipment
-    const activeMuscles = focusAreas.length > 0 ? focusAreas.join(', ').toLowerCase() : 'full-body muscles';
-    const gearUsed = equipment.length > 0 ? equipment[0].toLowerCase() : 'bodyweight';
+  // 21. Thumbprint Impression Screen (New)
+  const renderStep21 = () => {
+    const percent = Math.round(scanSharedProgress.value * 100);
+    return (
+      <Animated.View entering={FadeIn.duration(400)} style={[styles.welcomeContainer, { justifyContent: 'center' }]}>
+        {/* Full-screen fill transition overlay */}
+        <Animated.View style={[styles.scanFillOverlay, scanFillStyle]} pointerEvents="none" />
 
-    const handleStartProgram = () => {
-      // Save stats to Zustand store
+        <SystemText variant="h2" align="center" style={{ color: COLORS.primary, letterSpacing: 4, marginBottom: 16, fontWeight: 'bold' }}>
+          AWAKENING PROTOCOL
+        </SystemText>
+        
+        <SystemText variant="body" align="center" style={{ marginBottom: 40, lineHeight: 22, paddingHorizontal: 12 }}>
+          Place and hold your thumb on the biometric scanner below to finalize Hunter authorization.
+        </SystemText>
+
+        <View style={styles.scannerWrapper}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPressIn={startScanning}
+            onPressOut={stopScanning}
+            style={[styles.scannerButton, isScanning && styles.scannerButtonActive]}
+          >
+            {/* Simple pulsing SVG thumbprint */}
+            <Svg width="70" height="70" viewBox="0 0 24 24" fill="none" stroke={isScanning ? COLORS.primary : '#FFFFFF'} strokeWidth="1.5">
+              <Path d="M12 2a10 10 0 0 0-8 8m8-8a10 10 0 0 1 8 8" strokeLinecap="round" />
+              <Path d="M12 6a6 6 0 0 0-4.8 6m4.8-6a6 6 0 0 1 4.8 6" strokeLinecap="round" />
+              <Path d="M12 10a2 2 0 0 0-1.6 2m1.6-2a2 2 0 0 1 1.6 2" strokeLinecap="round" />
+              <Path d="M8 15a4 4 0 0 0 8 0" strokeLinecap="round" />
+              <Path d="M6 18a6 6 0 0 0 12 0" strokeLinecap="round" />
+              <Path d="M4 21a8 8 0 0 0 16 0" strokeLinecap="round" />
+            </Svg>
+          </TouchableOpacity>
+
+          <SystemText variant="mono" align="center" style={{ marginTop: 24, fontSize: 16, color: isScanning ? COLORS.primary : '#FFFFFF' }}>
+            {isScanning ? `AWAKENING SYNC: ${percent}%` : 'HOLD THUMB TO AUTHORIZE'}
+          </SystemText>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // 22. Awakening Program Final Summary & Launch
+  const renderStep22 = () => {
+    const activeMuscles = focusAreas.length > 0 ? focusAreas.join(', ').toLowerCase() : 'full-body muscles';
+    const gearUsed = equipment.length > 0 ? equipment.join(', ').toLowerCase() : 'bodyweight';
+
+    const handleStartProgram = async () => {
+      // Save stats and preferences to Zustand store
       setInitialData({
+        name: playerName,
         biometrics: {
           weight: weightInKg,
           height: heightInCm,
@@ -1184,15 +1376,28 @@ export default function Onboarding() {
           sex: 'male',
           hrv_baseline: 60,
         },
+        focusAreas: focusAreas,
+        equipment: equipment,
+        frequency: frequency,
+        motivation: motivation,
+        healthIssues: healthIssues,
+        stats: stats, // save calculated RPG stats
         goal: motivation.toLowerCase().includes('loss') ? 'cut' : 'bulk',
       });
+
+      try {
+        // Set completed in storage
+        await AsyncStorage.setItem('onboarding_completed', 'true');
+      } catch (e) {
+        console.warn('Failed to save onboarding completion state:', e);
+      }
+
       // Navigate to tabs
       router.replace('/(tabs)');
     };
 
     return (
-      <View style={styles.surveyContainer}>
-        {/* Resource summary grid */}
+      <Animated.View entering={FadeIn.duration(400)} style={styles.surveyContainer}>
         <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 20 }}>
           {/* Card 1: Water Goal */}
           <SystemCard glow style={styles.resourceSummaryBox}>
@@ -1239,21 +1444,20 @@ export default function Onboarding() {
         </ScrollView>
 
         <SystemButton title="Start My Program" onPress={handleStartProgram} />
-      </View>
+      </Animated.View>
     );
   };
 
   return (
     <View style={styles.container}>
       {/* Dynamic Survey Header Progress Bar */}
-      {step >= 3 && step <= 13 && (
+      {step >= 3 && step <= 12 && (
         <View style={styles.surveyHeader}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <ArrowLeft size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          {/* Progress Bar Track */}
           <View style={styles.surveyProgressTrack}>
-            <View style={[styles.surveyProgressFill, { width: `${surveyProgress}%` }]} />
+            <Animated.View style={[styles.surveyProgressFill, surveyProgressStyle]} />
           </View>
         </View>
       )}
@@ -1279,6 +1483,8 @@ export default function Onboarding() {
       {step === 18 && renderStep18()}
       {step === 19 && renderStep19()}
       {step === 20 && renderStep20()}
+      {step === 21 && renderStep21()}
+      {step === 22 && renderStep22()}
     </View>
   );
 }
@@ -1311,16 +1517,20 @@ const styles = StyleSheet.create({
   },
   welcomeCenter: {
     alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 20,
   },
   giantTitle: {
-    fontSize: 64,
+    fontSize: 56,
     fontWeight: 'bold',
     fontFamily: 'Space Grotesk',
-    letterSpacing: 8,
+    letterSpacing: 10,
     color: '#FFFFFF',
     textShadowColor: 'rgba(0, 191, 255, 0.4)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
+    textAlign: 'center',
+    width: '100%',
   },
   welcomeSubtitle: {
     fontSize: 16,
@@ -1458,7 +1668,7 @@ const styles = StyleSheet.create({
   pickerSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 40,
+    marginVertical: 18,
   },
   pickerArrow: {
     padding: 8,
@@ -1466,7 +1676,7 @@ const styles = StyleSheet.create({
   pickerDimmedText: {
     fontSize: 20,
     opacity: 0.3,
-    marginVertical: 8,
+    marginVertical: 4,
   },
   pickerFocusBox: {
     borderWidth: 1,
@@ -1475,13 +1685,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 32,
     minWidth: 160,
-    marginVertical: 8,
+    marginVertical: 4,
   },
   unitToggleRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
   },
   unitToggleLabel: {
     paddingHorizontal: 8,
@@ -1769,5 +1979,64 @@ const styles = StyleSheet.create({
   resourceSideRow: {
     flexDirection: 'row',
     gap: 12,
-  }
+  },
+  // New styles for Name page and Thumb Impression Scanner
+  nameInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 191, 255, 0.3)',
+    borderRadius: 6,
+    color: '#FFFFFF',
+    fontSize: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontFamily: 'Space Grotesk',
+  },
+  scanFillOverlay: {
+    position: 'absolute',
+    top: '35%',
+    left: '50%',
+    marginLeft: -150,
+    marginTop: -150,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(0, 191, 255, 0.98)',
+    zIndex: 9999,
+  },
+  scannerWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 30,
+  },
+  scannerButton: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#00BFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  scannerButtonActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: 'rgba(0, 191, 255, 0.1)',
+    shadowOpacity: 0.7,
+    shadowRadius: 25,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 75,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 191, 255, 0.4)',
+    opacity: 0.5,
+  },
 });
