@@ -14,6 +14,17 @@ export interface UserProfile {
   sex: 'male' | 'female';
   rankIndex: number;
   xp: number;
+  aura: number;
+  streak: number;
+}
+
+export interface SystemMessage {
+  id: string;
+  type: 'info' | 'warning' | 'achievement' | 'rankup' | 'quest_complete' | 'coach';
+  title: string;
+  body: string;
+  xpBadge?: number;
+  duration_ms: number;
 }
 
 export interface NightlyData {
@@ -76,10 +87,15 @@ export interface AriseStats {
 
 export interface Quest {
   id: string;
+  type: 'workout' | 'nutrition' | 'lifestyle' | 'boss';
   title: string;
   description: string;
-  rewardXP: number;
+  target: number;
+  unit: string;
+  progress: number;
+  xpReward: number;
   completed: boolean;
+  deadline: string;
 }
 
 export interface FoodItem {

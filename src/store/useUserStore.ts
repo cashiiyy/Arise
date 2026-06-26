@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { calculateRank, RANKS } from '../engine/XPSystem';
+import { calculateRank, RANKS } from '../services/xpEngine';
 
 interface UserState {
   name: string;
