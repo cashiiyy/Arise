@@ -24,6 +24,7 @@ export const StatRadarChart: React.FC<StatRadarChartProps> = ({ data, size = 300
   }, []);
 
   const getPointCoordinates = (value: number, index: number, total: number) => {
+    'worklet';
     const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
     const r = (value / 100) * radius;
     return {

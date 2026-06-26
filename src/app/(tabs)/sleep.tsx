@@ -4,10 +4,12 @@ import { SystemText } from '../../components/SystemText';
 import { SystemCard } from '../../components/SystemCard';
 import { ProgressRing } from '../../components/ProgressRing';
 import { COLORS } from '../../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Sleep() {
+  const insets = useSafeAreaInsets();
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(20, insets.top + 16) }]}>
       <SystemText variant="h2" align="center" style={{ marginBottom: 24 }}>
         RECOVERY PROTOCOL
       </SystemText>

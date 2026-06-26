@@ -7,10 +7,12 @@ import { COLORS } from '../../theme';
 import { StatRadarChart } from '../../components/StatRadarChart';
 import { RankBadge } from '../../components/RankBadge';
 import { RANKS } from '../../services/xpEngine';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Stats() {
   const { stats, rank, xp } = useUserStore();
   const rankIndex = RANKS.indexOf(rank);
+  const insets = useSafeAreaInsets();
 
   const statData = [
     { label: 'STR', value: stats.STR },
@@ -21,7 +23,7 @@ export default function Stats() {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(20, insets.top + 16) }]}>
       <SystemText variant="h2" align="center" style={{ marginBottom: 24 }}>
         PLAYER STATUS
       </SystemText>

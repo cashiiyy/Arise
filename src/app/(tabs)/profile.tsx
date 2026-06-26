@@ -10,9 +10,11 @@ import { useUserStore } from '../../store/useUserStore';
 import { COLORS, SYSTEM_GLOW } from '../../theme';
 import { RANKS } from '../../services/xpEngine';
 import { ShieldAlert, Trash2, Dumbbell, Activity, Shield, User } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Profile() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     name,
     rank,
@@ -63,7 +65,7 @@ export default function Profile() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(20, insets.top + 16) }]}>
       <SystemText variant="h2" align="center" style={styles.titleText}>
         HUNTER STATUS
       </SystemText>

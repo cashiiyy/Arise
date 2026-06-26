@@ -6,12 +6,14 @@ import { SystemButton } from '../../components/SystemButton';
 import { useUserStore } from '../../store/useUserStore';
 import { COLORS } from '../../theme';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Workout() {
   const [reps, setReps] = useState(10);
   const [weight, setWeight] = useState(20);
   const addXP = useUserStore((state) => state.addXP);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const handleComplete = () => {
     addXP(100);
@@ -21,7 +23,7 @@ export default function Workout() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(20, insets.top + 16) }]}>
       <SystemText variant="h1" align="center" style={{ marginBottom: 24, color: COLORS.secondary }}>
         CURRENT QUEST
       </SystemText>

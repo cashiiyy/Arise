@@ -8,8 +8,10 @@ import { SystemButton } from '../components/SystemButton';
 import { SystemCard } from '../components/SystemCard';
 import { useUserStore } from '../store/useUserStore';
 import { COLORS, SYSTEM_GLOW } from '../theme';
-import Svg, { Path, Circle, Rect, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Line, Defs, LinearGradient, Stop, Filter, FeGaussianBlur } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LocalDatabase } from '../services/localDatabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -58,6 +60,7 @@ const MuscleHighlightIcon: React.FC<{ muscle: string; active: boolean }> = ({ mu
 export default function Onboarding() {
   const router = useRouter();
   const setInitialData = useUserStore((state) => state.setInitialData);
+  const insets = useSafeAreaInsets();
 
   // Onboarding wizard steps (1 to 22)
   const [step, setStep] = useState(1);
@@ -113,6 +116,22 @@ export default function Onboarding() {
   const surveyAnimProgress = useSharedValue(0);
   const scanSharedProgress = useSharedValue(0);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
+  const scanIntervalRef = useRef<any>(null);
+
+  // Top level animated styles to comply with the Rules of Hooks
+  const strStyle = useAnimatedStyle(() => ({
+    width: `${statsAnimProgress.value * (stats.STR / 20) * 100}%`,
+  }));
+  const vitStyle = useAnimatedStyle(() => ({
+    width: `${statsAnimProgress.value * (stats.VIT / 20) * 100}%`,
+  }));
+  const agiStyle = useAnimatedStyle(() => ({
+    width: `${statsAnimProgress.value * (stats.AGI / 20) * 100}%`,
+  }));
+  const endStyle = useAnimatedStyle(() => ({
+    width: `${statsAnimProgress.value * (stats.END / 20) * 100}%`,
+  }));
 
   // Pulse animation for Welcome shadow silhouette
   useEffect(() => {
@@ -154,12 +173,6 @@ export default function Onboarding() {
       statsAnimProgress.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.quad) });
     }
   }, [step]);
-
-  const animatedBarWidth = (value: number) => {
-    return useAnimatedStyle(() => ({
-      width: `${statsAnimProgress.value * (value / 20) * 100}%`,
-    }));
-  };
 
   // Automatic transition for status screen (Step 16)
   useEffect(() => {
@@ -205,6 +218,7 @@ export default function Onboarding() {
 
   const startScanning = () => {
     setIsScanning(true);
+    setScanProgress(0);
     if (Vibration.vibrate) {
       Vibration.vibrate([100, 100], true);
     }
@@ -213,6 +227,16 @@ export default function Onboarding() {
         runOnJS(handleScanSuccess)();
       }
     });
+
+    const startTime = Date.now();
+    scanIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const pct = Math.min(100, (elapsed / 2200) * 100);
+      setScanProgress(pct);
+      if (pct >= 100) {
+        clearInterval(scanIntervalRef.current);
+      }
+    }, 30);
   };
 
   const stopScanning = () => {
@@ -220,8 +244,22 @@ export default function Onboarding() {
     if (Vibration.cancel) {
       Vibration.cancel();
     }
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+    }
     if (scanSharedProgress.value < 1) {
       scanSharedProgress.value = withTiming(0, { duration: 400 });
+      
+      const startVal = scanProgress;
+      const startTime = Date.now();
+      scanIntervalRef.current = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const pct = Math.max(0, startVal - (elapsed / 400) * startVal);
+        setScanProgress(pct);
+        if (pct <= 0) {
+          clearInterval(scanIntervalRef.current);
+        }
+      }, 30);
     }
   };
 
@@ -245,7 +283,12 @@ export default function Onboarding() {
       {/* Background Silhouette Blue Shadow Aura */}
       <Animated.View style={[styles.silhouetteAura, animatedAuraStyle]}>
         <Svg width="350" height="350" viewBox="0 0 100 100">
-          <Circle cx="50" cy="50" r="35" fill="rgba(0, 191, 255, 0.25)" filter="blur(20px)" />
+          <Defs>
+            <Filter id="blur">
+              <FeGaussianBlur stdDeviation={15} />
+            </Filter>
+          </Defs>
+          <Circle cx="50" cy="50" r="35" fill="rgba(0, 191, 255, 0.25)" filter="url(#blur)" />
         </Svg>
       </Animated.View>
 
@@ -1104,7 +1147,7 @@ export default function Onboarding() {
               <SystemText variant="h2" color="#EF4444" style={{ fontWeight: 'bold' }}>{stats.STR}</SystemText>
             </View>
             <View style={styles.statBarTrack}>
-              <Animated.View style={[styles.statBarFill, animatedBarWidth(stats.STR)]} />
+              <Animated.View style={[styles.statBarFill, strStyle]} />
             </View>
           </SystemCard>
 
@@ -1114,7 +1157,7 @@ export default function Onboarding() {
               <SystemText variant="h2" color="#EF4444" style={{ fontWeight: 'bold' }}>{stats.VIT}</SystemText>
             </View>
             <View style={styles.statBarTrack}>
-              <Animated.View style={[styles.statBarFill, animatedBarWidth(stats.VIT)]} />
+              <Animated.View style={[styles.statBarFill, vitStyle]} />
             </View>
           </SystemCard>
 
@@ -1124,7 +1167,7 @@ export default function Onboarding() {
               <SystemText variant="h2" color="#EF4444" style={{ fontWeight: 'bold' }}>{stats.AGI}</SystemText>
             </View>
             <View style={styles.statBarTrack}>
-              <Animated.View style={[styles.statBarFill, animatedBarWidth(stats.AGI)]} />
+              <Animated.View style={[styles.statBarFill, agiStyle]} />
             </View>
           </SystemCard>
 
@@ -1134,7 +1177,7 @@ export default function Onboarding() {
               <SystemText variant="h2" color="#EF4444" style={{ fontWeight: 'bold' }}>{stats.END}</SystemText>
             </View>
             <View style={styles.statBarTrack}>
-              <Animated.View style={[styles.statBarFill, animatedBarWidth(stats.END)]} />
+              <Animated.View style={[styles.statBarFill, endStyle]} />
             </View>
           </SystemCard>
         </View>
@@ -1320,7 +1363,7 @@ export default function Onboarding() {
 
   // 21. Thumbprint Impression Screen (New)
   const renderStep21 = () => {
-    const percent = Math.round(scanSharedProgress.value * 100);
+    const percent = Math.round(scanProgress);
     return (
       <Animated.View entering={FadeIn.duration(400)} style={[styles.welcomeContainer, { justifyContent: 'center' }]}>
         {/* Full-screen fill transition overlay */}
@@ -1366,30 +1409,47 @@ export default function Onboarding() {
     const gearUsed = equipment.length > 0 ? equipment.join(', ').toLowerCase() : 'bodyweight';
 
     const handleStartProgram = async () => {
-      // Save stats and preferences to Zustand store
-      setInitialData({
+      const profileData = {
         name: playerName,
-        biometrics: {
-          weight: weightInKg,
-          height: heightInCm,
-          age: age,
-          sex: 'male',
-          hrv_baseline: 60,
-        },
+        age: age,
+        height: heightInCm,
+        weight: weightInKg,
+        targetWeight: targetWeightInKg,
+        sex: 'male',
+        motivation: motivation,
         focusAreas: focusAreas,
         equipment: equipment,
         frequency: frequency,
-        motivation: motivation,
         healthIssues: healthIssues,
-        stats: stats, // save calculated RPG stats
-        goal: motivation.toLowerCase().includes('loss') ? 'cut' : 'bulk',
-      });
+      };
 
       try {
+        // Save to LocalDatabase (runs calculations for BMI, BMR, TDEE, macros, stats)
+        const computedProfile = await LocalDatabase.saveUserProfile(profileData);
+        
+        // Save computed details to Zustand store
+        setInitialData({
+          name: computedProfile.name,
+          biometrics: {
+            weight: computedProfile.weight,
+            height: computedProfile.height,
+            age: computedProfile.age,
+            sex: computedProfile.sex,
+            hrv_baseline: 60,
+          },
+          focusAreas: computedProfile.focusAreas,
+          equipment: computedProfile.equipment,
+          frequency: computedProfile.frequency,
+          motivation: computedProfile.motivation,
+          healthIssues: computedProfile.healthIssues,
+          stats: computedProfile.rpgStats, // computed by the database service
+          goal: computedProfile.motivation.toLowerCase().includes('loss') ? 'cut' : 'bulk',
+        });
+
         // Set completed in storage
         await AsyncStorage.setItem('onboarding_completed', 'true');
       } catch (e) {
-        console.warn('Failed to save onboarding completion state:', e);
+        console.warn('Failed to save profile database and onboarding state:', e);
       }
 
       // Navigate to tabs
@@ -1449,7 +1509,7 @@ export default function Onboarding() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Dynamic Survey Header Progress Bar */}
       {step >= 3 && step <= 12 && (
         <View style={styles.surveyHeader}>
@@ -1498,7 +1558,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 40,
     alignItems: 'center',
   },
@@ -1576,7 +1636,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 12,
     paddingBottom: 16,
   },
   backButton: {

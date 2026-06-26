@@ -7,13 +7,15 @@ import { useUserStore } from '../../store/useUserStore';
 import { LiveWatchWidget } from '../../components/LiveWatchWidget';
 import { COLORS } from '../../theme';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Home() {
   const { name, rank, xp } = useUserStore();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(20, insets.top + 16) }]}>
       {/* Top Profile Section */}
       <View style={styles.header}>
         <View style={styles.rankBadge}>

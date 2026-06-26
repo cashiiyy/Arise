@@ -5,8 +5,10 @@ import { SystemCard } from '../../components/SystemCard';
 import { SystemButton } from '../../components/SystemButton';
 import { ProgressRing } from '../../components/ProgressRing';
 import { COLORS } from '../../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Nutrition() {
+  const insets = useSafeAreaInsets();
   const macros = {
     protein: 140, // out of 180g
     carbs: 200,   // out of 250g
@@ -14,7 +16,7 @@ export default function Nutrition() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(20, insets.top + 16) }]}>
       <SystemText variant="h2" align="center" style={{ marginBottom: 24 }}>
         NUTRITION PROTOCOL
       </SystemText>

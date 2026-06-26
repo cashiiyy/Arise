@@ -22,7 +22,7 @@ export class WatchBridge {
         const { BleManager } = require('react-native-ble-plx');
         this.manager = new BleManager();
       } catch (e) {
-        console.warn('BLE Manager could not be initialized (likely simulator):', e);
+        console.log('BLE Manager is not available (likely simulator or non-native):', (e as any).message || e);
       }
     }
   }

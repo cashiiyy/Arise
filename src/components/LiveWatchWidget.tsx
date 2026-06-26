@@ -115,7 +115,6 @@ export const LiveWatchWidget: React.FC = () => {
     return {
       transform: [{ scale: pulseScale.value }],
       opacity: pulseOpacity.value,
-      borderColor: getZoneColor(currentZone),
     };
   });
 
@@ -155,7 +154,7 @@ export const LiveWatchWidget: React.FC = () => {
         <View style={styles.telemetryRow}>
           {/* Heart Rate Pulse Animation */}
           <View style={styles.hrContainer}>
-            <Animated.View style={[styles.pulseRing, animatedPulseStyle]} />
+            <Animated.View style={[styles.pulseRing, animatedPulseStyle, { borderColor: getZoneColor(currentZone) }]} />
             <View style={[styles.hrInner, { borderColor: getZoneColor(currentZone) }]}>
               <SystemText variant="h1" style={{ fontSize: 36, color: getZoneColor(currentZone), fontWeight: 'bold' }}>
                 {liveBPM > 0 ? liveBPM : '--'}
